@@ -8,6 +8,7 @@ import (
 	"gittub.com/illenko/onboarding-service/internal/model"
 	"gittub.com/illenko/onboarding-service/internal/queue"
 	"gittub.com/illenko/onboarding-service/internal/workflow"
+	httpModel "gittub.com/illenko/onboarding-service/pkg/http"
 	"go.temporal.io/sdk/client"
 	"go.temporal.io/sdk/worker"
 	"log"
@@ -28,11 +29,6 @@ func main() {
 
 	defer temporalClient.Close()
 
-	options := client.StartWorkflowOptions{
-		ID:        uuid.New().String(),
-		TaskQueue: queue.OnboardingTask,
-	}
-
 	router.POST("/onboarding", func(c *gin.Context) {
 
 		var input model.UserRequest
@@ -46,6 +42,11 @@ func main() {
 			return
 		}
 
+		options := client.StartWorkflowOptions{
+			ID:        uuid.New().String(),
+			TaskQueue: queue.OnboardingTask,
+		}
+
 		we, err := temporalClient.ExecuteWorkflow(context.Background(), options, workflow.Onboarding, input)
 		if err != nil {
 			log.Fatalln("Unable to start the Workflow:", err)
@@ -53,13 +54,21 @@ func main() {
 
 		log.Printf("WorkflowID: %s RunID: %s\n", we.GetID(), we.GetRunID())
 
-		var result string
+		var result httpModel.OnboardingResponse
 
 		err = we.Get(context.Background(), &result)
 
 		if err != nil {
 			log.Fatalln("Unable to get Workflow result:", err)
+
+			c.JSON(http.StatusInternalServerError, model.ErrorResponse{
+				Code:    "internal_error",
+				Message: "Unable to get Workflow result",
+			})
+			return
 		}
+
+		c.JSON(http.StatusOK, result)
 	})
 
 	router.Run(":8080")
@@ -76,6 +85,11 @@ func startWorker() {
 
 	w.RegisterWorkflow(workflow.Onboarding)
 	w.RegisterActivity(activity.AntifraudChecks)
+	w.RegisterActivity(activity.CreateUser)
+	w.RegisterActivity(activity.CreateAccount)
+	w.RegisterActivity(activity.CreateAgreement)
+	w.RegisterActivity(activity.CreateSignature)
+	w.RegisterActivity(activity.CreateCard)
 
 	// Start listening to the Task Queue.
 	err = w.Run(worker.InterruptCh())
