@@ -15,5 +15,8 @@ func main() {
 	router.POST("/account-service/accounts", accountsHandler)
 	router.POST("/card-service/cards", cardsHandler)
 
-	router.Run(":8081")
+	err := router.Run(":8081")
+	if err != nil {
+		return
+	}
 }
