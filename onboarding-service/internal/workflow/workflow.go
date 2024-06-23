@@ -9,6 +9,10 @@ import (
 	"time"
 )
 
+type SignatureSignal struct {
+	Signature string
+}
+
 func Onboarding(ctx workflow.Context, input model.UserRequest) (http.OnboardingResponse, error) {
 	retryPolicy := &temporal.RetryPolicy{
 		InitialInterval:    time.Second,
@@ -75,10 +79,15 @@ func Onboarding(ctx workflow.Context, input model.UserRequest) (http.OnboardingR
 		return http.OnboardingResponse{}, agreementErr
 	}
 
+	var signal SignatureSignal
+
+	signalChan := workflow.GetSignalChannel(ctx, "signature-signal")
+	signalChan.Receive(ctx, &signal)
+
 	// Create signature.
 	signatureInput := model.SignatureRequest{
 		AgreementID: agreementOutput.ID,
-		Signature:   "signature",
+		Signature:   signal.Signature,
 	}
 
 	var signatureOutput model.SignatureResponse

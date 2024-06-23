@@ -2,6 +2,11 @@ package http
 
 import "github.com/google/uuid"
 
+type OnboardingStatus struct {
+	ID    uuid.UUID `json:"id"`
+	State string    `json:"state"`
+}
+
 type OnboardingResponse struct {
 	ID      uuid.UUID `json:"id"`
 	Status  string    `json:"status"`
