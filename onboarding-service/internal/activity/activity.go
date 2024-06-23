@@ -2,6 +2,8 @@ package activity
 
 import (
 	"context"
+	"strings"
+
 	"github.com/go-resty/resty/v2"
 	"gittub.com/illenko/onboarding-service/internal/model"
 )
@@ -65,5 +67,17 @@ func CreateSignature(ctx context.Context, data model.SignatureRequest) (model.Si
 func CreateCard(ctx context.Context, data model.CardRequest) (model.CardResponse, error) {
 	var cardResponse model.CardResponse
 	err := makeRequest("http://localhost:8081/card-service/cards", data, &cardResponse)
+	if err == nil {
+		cardResponse.Cvv = "***"
+		cardResponse.Number = maskPAN(cardResponse.Number)
+		return cardResponse, err
+	}
 	return cardResponse, err
+}
+
+func maskPAN(pan string) string {
+	if len(pan) <= 10 {
+		return pan
+	}
+	return pan[0:6] + strings.Repeat("*", len(pan)-10) + pan[len(pan)-4:]
 }

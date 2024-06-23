@@ -1,12 +1,13 @@
 package worker
 
 import (
+	"log"
+
 	"gittub.com/illenko/onboarding-service/internal/activity"
 	"gittub.com/illenko/onboarding-service/internal/queue"
 	"gittub.com/illenko/onboarding-service/internal/workflow"
 	"go.temporal.io/sdk/client"
 	"go.temporal.io/sdk/worker"
-	"log"
 )
 
 func Run() {
@@ -26,9 +27,10 @@ func Run() {
 	w.RegisterActivity(activity.CreateSignature)
 	w.RegisterActivity(activity.CreateCard)
 
-	// Start listening to the Task Queue.
-	err = w.Run(worker.InterruptCh())
-	if err != nil {
-		log.Fatalln("unable to start Worker", err)
-	}
+	go func() {
+		err = w.Run(worker.InterruptCh())
+		if err != nil {
+			log.Fatalln("unable to start Worker", err)
+		}
+	}()
 }

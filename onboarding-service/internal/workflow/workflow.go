@@ -1,19 +1,24 @@
 package workflow
 
 import (
+	"time"
+
 	"gittub.com/illenko/onboarding-service/internal/activity"
 	"gittub.com/illenko/onboarding-service/internal/model"
-	"gittub.com/illenko/onboarding-service/pkg/http"
 	"go.temporal.io/sdk/temporal"
 	"go.temporal.io/sdk/workflow"
-	"time"
 )
 
 type SignatureSignal struct {
 	Signature string
 }
 
-func Onboarding(ctx workflow.Context, input model.UserRequest) (http.OnboardingResponse, error) {
+type CurrentState struct {
+	State string                 `json:"state"`
+	Data  map[string]interface{} `json:"data"`
+}
+
+func Onboarding(ctx workflow.Context, input model.UserRequest) (CurrentState, error) {
 	retryPolicy := &temporal.RetryPolicy{
 		InitialInterval:    time.Second,
 		BackoffCoefficient: 2.0,
@@ -26,6 +31,18 @@ func Onboarding(ctx workflow.Context, input model.UserRequest) (http.OnboardingR
 		RetryPolicy:         retryPolicy,
 	}
 
+	currentState := CurrentState{State: "processing"}
+	queryType := "current_state"
+
+	err := workflow.SetQueryHandler(ctx, queryType, func() (CurrentState, error) {
+		return currentState, nil
+	})
+
+	if err != nil {
+		currentState = CurrentState{State: "failed"}
+		return currentState, err
+	}
+
 	ctx = workflow.WithActivityOptions(ctx, options)
 
 	// Withdraw money.
@@ -34,11 +51,15 @@ func Onboarding(ctx workflow.Context, input model.UserRequest) (http.OnboardingR
 	antifraudErr := workflow.ExecuteActivity(ctx, activity.AntifraudChecks, input).Get(ctx, &antifraudChecksOutput)
 
 	if antifraudErr != nil {
-		return http.OnboardingResponse{}, antifraudErr
+		currentState = CurrentState{State: "failed"}
+		return currentState, antifraudErr
 	}
 
 	if !antifraudChecksOutput.Passed {
-		return http.OnboardingResponse{Status: "fraud_not_passed"}, nil
+		currentState = CurrentState{
+			State: "fraud_not_passed",
+			Data:  map[string]interface{}{"comment": antifraudChecksOutput.Comment}}
+		return currentState, nil
 	}
 
 	// Create user.
@@ -47,7 +68,8 @@ func Onboarding(ctx workflow.Context, input model.UserRequest) (http.OnboardingR
 	userErr := workflow.ExecuteActivity(ctx, activity.CreateUser, input).Get(ctx, &userOutput)
 
 	if userErr != nil {
-		return http.OnboardingResponse{}, userErr
+		currentState = CurrentState{State: "failed"}
+		return currentState, userErr
 	}
 
 	// Create account.
@@ -62,7 +84,8 @@ func Onboarding(ctx workflow.Context, input model.UserRequest) (http.OnboardingR
 	accountErr := workflow.ExecuteActivity(ctx, activity.CreateAccount, accountInput).Get(ctx, &accountOutput)
 
 	if accountErr != nil {
-		return http.OnboardingResponse{}, accountErr
+		currentState = CurrentState{State: "failed"}
+		return currentState, accountErr
 	}
 
 	// Create agreement.
@@ -76,7 +99,13 @@ func Onboarding(ctx workflow.Context, input model.UserRequest) (http.OnboardingR
 	agreementErr := workflow.ExecuteActivity(ctx, activity.CreateAgreement, agreementInput).Get(ctx, &agreementOutput)
 
 	if agreementErr != nil {
-		return http.OnboardingResponse{}, agreementErr
+		currentState = CurrentState{State: "failed"}
+		return currentState, agreementErr
+	}
+
+	currentState = CurrentState{
+		State: "waiting_for_signature",
+		Data:  map[string]interface{}{"link": agreementOutput.Link},
 	}
 
 	var signal SignatureSignal
@@ -95,8 +124,11 @@ func Onboarding(ctx workflow.Context, input model.UserRequest) (http.OnboardingR
 	signatureErr := workflow.ExecuteActivity(ctx, activity.CreateSignature, signatureInput).Get(ctx, &signatureOutput)
 
 	if signatureErr != nil {
-		return http.OnboardingResponse{}, signatureErr
+		currentState = CurrentState{State: "failed"}
+		return currentState, signatureErr
 	}
+
+	currentState = CurrentState{State: "processing"}
 
 	// Create card.
 	cardInput := model.CardRequest{
@@ -108,25 +140,14 @@ func Onboarding(ctx workflow.Context, input model.UserRequest) (http.OnboardingR
 	cardErr := workflow.ExecuteActivity(ctx, activity.CreateCard, cardInput).Get(ctx, &cardOutput)
 
 	if cardErr != nil {
-		return http.OnboardingResponse{}, cardErr
+		currentState = CurrentState{State: "failed"}
+		return currentState, cardErr
 	}
 
-	return http.OnboardingResponse{
-		ID:      userOutput.ID,
-		Status:  "success",
-		Comment: "User created",
-		Account: http.Account{
-			ID:       accountOutput.ID,
-			Currency: accountOutput.Currency,
-			Type:     accountOutput.Type,
-			Iban:     accountOutput.Iban,
-			Balance:  accountOutput.Balance,
-		},
-		Card: http.Card{
-			ID:     cardOutput.ID,
-			Number: cardOutput.Number,
-			Expire: cardOutput.Expire,
-			Cvv:    cardOutput.Cvv,
-		},
-	}, nil
+	currentState = CurrentState{
+		State: "completed",
+		Data:  map[string]interface{}{"account": accountOutput, "card": cardOutput},
+	}
+
+	return currentState, nil
 }
