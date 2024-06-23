@@ -1,6 +1,8 @@
 package workflow
 
 import (
+	"time"
+
 	"github.com/illenko/onboarding-service/internal/activity"
 	"github.com/illenko/onboarding-service/internal/input"
 	"github.com/illenko/onboarding-service/internal/output"
@@ -11,7 +13,6 @@ import (
 	"github.com/illenko/onboarding-service/pkg/state"
 	"go.temporal.io/sdk/temporal"
 	"go.temporal.io/sdk/workflow"
-	"time"
 )
 
 const (
@@ -82,7 +83,7 @@ func Onboarding(ctx workflow.Context, input input.Onboarding) (output.Onboarding
 		AccountID: createAccountResult.ID,
 	}
 
-	createAgreementResult, err := executeActivity[request.Agreement, response.Agreement](ctx, activity.AntifraudChecks, agreementInput)
+	createAgreementResult, err := executeActivity[request.Agreement, response.Agreement](ctx, activity.CreateAgreement, agreementInput)
 	if err != nil {
 		currentState = output.Onboarding{State: state.FailedState}
 		return currentState, err

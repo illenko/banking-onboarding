@@ -15,7 +15,7 @@ type OnboardingRequest struct {
 type OnboardingStatus struct {
 	ID    uuid.UUID             `json:"id"`
 	State state.OnboardingState `json:"state"`
-	Data  map[string]any        `json:"data"`
+	Data  map[string]any        `json:"data,omitempty"`
 }
 
 type SignatureRequest struct {

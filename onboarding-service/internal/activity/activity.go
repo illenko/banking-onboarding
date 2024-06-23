@@ -2,6 +2,7 @@ package activity
 
 import (
 	"context"
+
 	"github.com/illenko/onboarding-service/internal/configuration"
 
 	"github.com/go-resty/resty/v2"
