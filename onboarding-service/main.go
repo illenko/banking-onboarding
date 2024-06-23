@@ -2,21 +2,26 @@ package main
 
 import (
 	"context"
+	"github.com/illenko/onboarding-service/internal/configuration"
 	"log"
 	"net/http"
 
 	"github.com/gin-gonic/gin"
 	"github.com/google/uuid"
-	"gittub.com/illenko/onboarding-service/internal/model"
-	"gittub.com/illenko/onboarding-service/internal/queue"
-	"gittub.com/illenko/onboarding-service/internal/worker"
-	"gittub.com/illenko/onboarding-service/internal/workflow"
-	httpModel "gittub.com/illenko/onboarding-service/pkg/http"
+	"github.com/illenko/onboarding-service/internal/input"
+	"github.com/illenko/onboarding-service/internal/output"
+	"github.com/illenko/onboarding-service/internal/queue"
+	"github.com/illenko/onboarding-service/internal/signal"
+	"github.com/illenko/onboarding-service/internal/worker"
+	"github.com/illenko/onboarding-service/internal/workflow"
+	httpModel "github.com/illenko/onboarding-service/pkg/http"
 	"go.temporal.io/sdk/client"
 )
 
 func main() {
-	worker.Run()
+	configuration.LoadEnv()
+
+	go worker.Run()
 
 	router := gin.Default()
 
@@ -40,8 +45,8 @@ func handleOnboarding(temporalClient client.Client) gin.HandlerFunc {
 	return func(c *gin.Context) {
 		id := uuid.New()
 
-		var input model.UserRequest
-		err := c.Bind(&input)
+		var request httpModel.OnboardingRequest
+		err := c.Bind(&request)
 		if err != nil {
 			sendErrorResponse(c, http.StatusBadRequest, "Invalid request")
 			return
@@ -52,15 +57,23 @@ func handleOnboarding(temporalClient client.Client) gin.HandlerFunc {
 			TaskQueue: queue.OnboardingTask,
 		}
 
+		onboardingInput := input.Onboarding{
+			ID:        id,
+			FirstName: request.FirstName,
+			LastName:  request.LastName,
+			Email:     request.Email,
+			City:      request.City,
+		}
+
 		go func() {
-			we, err := temporalClient.ExecuteWorkflow(context.Background(), options, workflow.Onboarding, input)
+			we, err := temporalClient.ExecuteWorkflow(context.Background(), options, workflow.Onboarding, onboardingInput)
 			if err != nil {
 				log.Fatalln("Unable to start the Workflow:", err)
 			}
 
 			log.Printf("WorkflowID: %s RunID: %s\n", we.GetID(), we.GetRunID())
 
-			var result workflow.CurrentState
+			var result output.Onboarding
 
 			err = we.Get(context.Background(), &result)
 
@@ -84,14 +97,18 @@ func handleSignature(temporalClient client.Client) gin.HandlerFunc {
 			return
 		}
 
-		var input workflow.SignatureSignal
-		err = c.Bind(&input)
+		var request httpModel.SignatureRequest
+		err = c.Bind(&request)
 		if err != nil {
 			sendErrorResponse(c, http.StatusBadRequest, "Invalid request")
 			return
 		}
 
-		err = temporalClient.SignalWorkflow(context.Background(), id.String(), "", "signature-signal", input)
+		signatureSignal := signal.Signature{
+			Signature: request.Signature,
+		}
+
+		err = temporalClient.SignalWorkflow(context.Background(), id.String(), "", signal.SignatureSignal, signatureSignal)
 		if err != nil {
 			sendErrorResponse(c, http.StatusInternalServerError, "Unable to signal the Workflow")
 			return
@@ -120,7 +137,7 @@ func handleGetOnboarding(temporalClient client.Client) gin.HandlerFunc {
 			return
 		}
 
-		var currentState workflow.CurrentState
+		var currentState output.Onboarding
 		err = response.Get(&currentState)
 		if err != nil {
 			sendErrorResponse(c, http.StatusInternalServerError, "Unable to get the current state")
@@ -136,7 +153,7 @@ func handleGetOnboarding(temporalClient client.Client) gin.HandlerFunc {
 }
 
 func sendErrorResponse(c *gin.Context, statusCode int, message string) {
-	c.JSON(statusCode, model.ErrorResponse{
+	c.JSON(statusCode, httpModel.ErrorResponse{
 		Code:    "bad_request",
 		Message: message,
 	})

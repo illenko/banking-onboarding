@@ -1,4 +1,4 @@
-module gittub.com/illenko/onboarding-service
+module github.com/illenko/onboarding-service
 
 go 1.22.3
 
@@ -6,6 +6,7 @@ require (
 	github.com/gin-gonic/gin v1.10.0
 	github.com/go-resty/resty/v2 v2.13.1
 	github.com/google/uuid v1.6.0
+	github.com/joho/godotenv v1.5.1
 	go.temporal.io/sdk v1.27.0
 )
 

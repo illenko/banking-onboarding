@@ -3,9 +3,9 @@ package worker
 import (
 	"log"
 
-	"gittub.com/illenko/onboarding-service/internal/activity"
-	"gittub.com/illenko/onboarding-service/internal/queue"
-	"gittub.com/illenko/onboarding-service/internal/workflow"
+	"github.com/illenko/onboarding-service/internal/activity"
+	"github.com/illenko/onboarding-service/internal/queue"
+	"github.com/illenko/onboarding-service/internal/workflow"
 	"go.temporal.io/sdk/client"
 	"go.temporal.io/sdk/worker"
 )
@@ -24,13 +24,12 @@ func Run() {
 	w.RegisterActivity(activity.CreateUser)
 	w.RegisterActivity(activity.CreateAccount)
 	w.RegisterActivity(activity.CreateAgreement)
-	w.RegisterActivity(activity.CreateSignature)
+	w.RegisterActivity(activity.ValidateSignature)
 	w.RegisterActivity(activity.CreateCard)
 
-	go func() {
-		err = w.Run(worker.InterruptCh())
-		if err != nil {
-			log.Fatalln("unable to start Worker", err)
-		}
-	}()
+	err = w.Run(worker.InterruptCh())
+	if err != nil {
+		log.Fatalln("unable to start Worker", err)
+	}
+
 }

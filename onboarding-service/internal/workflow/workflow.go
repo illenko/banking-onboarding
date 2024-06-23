@@ -1,24 +1,141 @@
 package workflow
 
 import (
-	"time"
-
-	"gittub.com/illenko/onboarding-service/internal/activity"
-	"gittub.com/illenko/onboarding-service/internal/model"
+	"github.com/illenko/onboarding-service/internal/activity"
+	"github.com/illenko/onboarding-service/internal/input"
+	"github.com/illenko/onboarding-service/internal/output"
+	"github.com/illenko/onboarding-service/internal/query"
+	"github.com/illenko/onboarding-service/internal/request"
+	"github.com/illenko/onboarding-service/internal/response"
+	"github.com/illenko/onboarding-service/internal/signal"
+	"github.com/illenko/onboarding-service/pkg/state"
 	"go.temporal.io/sdk/temporal"
 	"go.temporal.io/sdk/workflow"
+	"time"
 )
 
-type SignatureSignal struct {
-	Signature string
+const (
+	AccountTypePersonal = "personal"
+	CurrencyUAH         = "UAH"
+)
+
+func Onboarding(ctx workflow.Context, input input.Onboarding) (output.Onboarding, error) {
+	options := getDefaultActivityOptions()
+
+	currentState := output.Onboarding{State: state.ProcessingState}
+
+	err := workflow.SetQueryHandler(ctx, query.CurrentState, func() (output.Onboarding, error) {
+		return currentState, nil
+	})
+
+	if err != nil {
+		currentState = output.Onboarding{State: state.FailedState}
+		return currentState, err
+	}
+
+	ctx = workflow.WithActivityOptions(ctx, options)
+
+	userInput := request.User{
+		FirstName: input.FirstName,
+		LastName:  input.LastName,
+		Email:     input.Email,
+		City:      input.City,
+	}
+
+	// 1. Execute antifraud checks
+	antifraudChecksResult, err := executeActivity[request.User, response.Antifraud](ctx, activity.AntifraudChecks, userInput)
+
+	if err != nil {
+		currentState = output.Onboarding{State: state.FailedState}
+		return currentState, err
+	}
+
+	// If antifraud checks failed, return fraud_not_passed state
+	if !antifraudChecksResult.Passed {
+		currentState = output.Onboarding{State: state.FraudNotPassedState}
+		return currentState, nil
+	}
+
+	// 2. Create user
+	createUserResult, err := executeActivity[request.User, response.User](ctx, activity.CreateUser, userInput)
+	if err != nil {
+		currentState = output.Onboarding{State: state.FailedState}
+		return currentState, err
+	}
+
+	// 3. Create account
+	accountInput := request.Account{
+		UserID:   createUserResult.ID,
+		Type:     AccountTypePersonal,
+		Currency: CurrencyUAH,
+	}
+
+	createAccountResult, err := executeActivity[request.Account, response.Account](ctx, activity.CreateAccount, accountInput)
+	if err != nil {
+		currentState = output.Onboarding{State: state.FailedState}
+		return currentState, err
+	}
+
+	// 4. Create agreement
+	agreementInput := request.Agreement{
+		UserID:    createUserResult.ID,
+		AccountID: createAccountResult.ID,
+	}
+
+	createAgreementResult, err := executeActivity[request.Agreement, response.Agreement](ctx, activity.AntifraudChecks, agreementInput)
+	if err != nil {
+		currentState = output.Onboarding{State: state.FailedState}
+		return currentState, err
+	}
+
+	// 5. Wait for signature
+	currentState = output.Onboarding{
+		State: state.WaitingForAgreementSignatureState,
+		Data:  map[string]any{"link": createAgreementResult.Link},
+	}
+
+	var signatureSignal signal.Signature
+
+	signalChan := workflow.GetSignalChannel(ctx, signal.SignatureSignal)
+	signalChan.Receive(ctx, &signatureSignal)
+
+	// Send signature for validation
+	signatureInput := request.Signature{
+		AgreementID: createAgreementResult.ID,
+		Signature:   signatureSignal.Signature,
+	}
+
+	signatureResult, err := executeActivity[request.Signature, response.Signature](ctx, activity.ValidateSignature, signatureInput)
+	if err != nil {
+		currentState = output.Onboarding{State: state.FailedState}
+		return currentState, err
+	}
+
+	// If signature is not valid, return signature_not_valid state
+	if !signatureResult.Valid {
+		currentState = output.Onboarding{State: state.SignatureNotValidSate}
+		return currentState, nil
+	}
+
+	currentState = output.Onboarding{State: state.ProcessingState}
+
+	// 6. Create card
+	cardInput := request.Card{
+		AccountID: createAccountResult.ID,
+	}
+
+	createCardResult, err := executeActivity[request.Card, response.Card](ctx, activity.CreateCard, cardInput)
+	if err != nil {
+		currentState = output.Onboarding{State: state.FailedState}
+		return currentState, err
+	}
+
+	currentState = toFinalState(createAccountResult, createCardResult)
+
+	return currentState, nil
 }
 
-type CurrentState struct {
-	State string                 `json:"state"`
-	Data  map[string]interface{} `json:"data"`
-}
-
-func Onboarding(ctx workflow.Context, input model.UserRequest) (CurrentState, error) {
+func getDefaultActivityOptions() workflow.ActivityOptions {
 	retryPolicy := &temporal.RetryPolicy{
 		InitialInterval:    time.Second,
 		BackoffCoefficient: 2.0,
@@ -31,123 +148,21 @@ func Onboarding(ctx workflow.Context, input model.UserRequest) (CurrentState, er
 		RetryPolicy:         retryPolicy,
 	}
 
-	currentState := CurrentState{State: "processing"}
-	queryType := "current_state"
+	return options
+}
 
-	err := workflow.SetQueryHandler(ctx, queryType, func() (CurrentState, error) {
-		return currentState, nil
-	})
+func executeActivity[I any, R any](ctx workflow.Context, activityFunc interface{}, input I) (R, error) {
+	var res R
+	err := workflow.ExecuteActivity(ctx, activityFunc, input).Get(ctx, &res)
+	return res, err
+}
 
-	if err != nil {
-		currentState = CurrentState{State: "failed"}
-		return currentState, err
+func toFinalState(accountResult response.Account, cardResult response.Card) output.Onboarding {
+	return output.Onboarding{
+		State: state.CompletedState,
+		Data: map[string]any{
+			"account": accountResult,
+			"card":    cardResult,
+		},
 	}
-
-	ctx = workflow.WithActivityOptions(ctx, options)
-
-	// Withdraw money.
-	var antifraudChecksOutput model.AntifraudResponse
-
-	antifraudErr := workflow.ExecuteActivity(ctx, activity.AntifraudChecks, input).Get(ctx, &antifraudChecksOutput)
-
-	if antifraudErr != nil {
-		currentState = CurrentState{State: "failed"}
-		return currentState, antifraudErr
-	}
-
-	if !antifraudChecksOutput.Passed {
-		currentState = CurrentState{
-			State: "fraud_not_passed",
-			Data:  map[string]interface{}{"comment": antifraudChecksOutput.Comment}}
-		return currentState, nil
-	}
-
-	// Create user.
-	var userOutput model.UserResponse
-
-	userErr := workflow.ExecuteActivity(ctx, activity.CreateUser, input).Get(ctx, &userOutput)
-
-	if userErr != nil {
-		currentState = CurrentState{State: "failed"}
-		return currentState, userErr
-	}
-
-	// Create account.
-	accountInput := model.AccountRequest{
-		UserID:   userOutput.ID,
-		Type:     "personal",
-		Currency: "USD",
-	}
-
-	var accountOutput model.AccountResponse
-
-	accountErr := workflow.ExecuteActivity(ctx, activity.CreateAccount, accountInput).Get(ctx, &accountOutput)
-
-	if accountErr != nil {
-		currentState = CurrentState{State: "failed"}
-		return currentState, accountErr
-	}
-
-	// Create agreement.
-	agreementInput := model.AgreementRequest{
-		UserID:    userOutput.ID,
-		AccountID: accountOutput.ID,
-	}
-
-	var agreementOutput model.AgreementResponse
-
-	agreementErr := workflow.ExecuteActivity(ctx, activity.CreateAgreement, agreementInput).Get(ctx, &agreementOutput)
-
-	if agreementErr != nil {
-		currentState = CurrentState{State: "failed"}
-		return currentState, agreementErr
-	}
-
-	currentState = CurrentState{
-		State: "waiting_for_signature",
-		Data:  map[string]interface{}{"link": agreementOutput.Link},
-	}
-
-	var signal SignatureSignal
-
-	signalChan := workflow.GetSignalChannel(ctx, "signature-signal")
-	signalChan.Receive(ctx, &signal)
-
-	// Create signature.
-	signatureInput := model.SignatureRequest{
-		AgreementID: agreementOutput.ID,
-		Signature:   signal.Signature,
-	}
-
-	var signatureOutput model.SignatureResponse
-
-	signatureErr := workflow.ExecuteActivity(ctx, activity.CreateSignature, signatureInput).Get(ctx, &signatureOutput)
-
-	if signatureErr != nil {
-		currentState = CurrentState{State: "failed"}
-		return currentState, signatureErr
-	}
-
-	currentState = CurrentState{State: "processing"}
-
-	// Create card.
-	cardInput := model.CardRequest{
-		AccountID: accountOutput.ID,
-	}
-
-	var cardOutput model.CardResponse
-
-	cardErr := workflow.ExecuteActivity(ctx, activity.CreateCard, cardInput).Get(ctx, &cardOutput)
-
-	if cardErr != nil {
-		currentState = CurrentState{State: "failed"}
-		return currentState, cardErr
-	}
-
-	currentState = CurrentState{
-		State: "completed",
-		Data:  map[string]interface{}{"account": accountOutput, "card": cardOutput},
-	}
-
-	return currentState, nil
 }

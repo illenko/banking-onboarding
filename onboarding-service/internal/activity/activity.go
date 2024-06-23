@@ -2,10 +2,12 @@ package activity
 
 import (
 	"context"
-	"strings"
+	"github.com/illenko/onboarding-service/internal/configuration"
 
 	"github.com/go-resty/resty/v2"
-	"gittub.com/illenko/onboarding-service/internal/model"
+	"github.com/illenko/onboarding-service/internal/request"
+	"github.com/illenko/onboarding-service/internal/response"
+	"github.com/illenko/onboarding-service/internal/util"
 )
 
 type RequestError struct{}
@@ -16,7 +18,7 @@ func (m *RequestError) Error() string {
 
 var client = resty.New()
 
-func makeRequest(url string, requestBody interface{}, responseBody interface{}) error {
+func makeRequest(url string, requestBody any, responseBody any) error {
 	resp, err := client.R().
 		SetHeader("Content-Type", "application/json").
 		SetBody(requestBody).
@@ -34,50 +36,41 @@ func makeRequest(url string, requestBody interface{}, responseBody interface{}) 
 	return nil
 }
 
-func AntifraudChecks(ctx context.Context, data model.UserRequest) (model.AntifraudResponse, error) {
-	var antifraudResponse model.AntifraudResponse
-	err := makeRequest("http://localhost:8081/antifraud-service/checks", data, &antifraudResponse)
+func AntifraudChecks(ctx context.Context, data request.User) (response.Antifraud, error) {
+	var antifraudResponse response.Antifraud
+	err := makeRequest(configuration.Get("ANTIFRAUD_SERVICE_URL")+"/checks", data, &antifraudResponse)
 	return antifraudResponse, err
 }
-
-func CreateUser(ctx context.Context, data model.UserRequest) (model.UserResponse, error) {
-	var userResponse model.UserResponse
-	err := makeRequest("http://localhost:8081/user-service/users", data, &userResponse)
+func CreateUser(ctx context.Context, data request.User) (response.User, error) {
+	var userResponse response.User
+	err := makeRequest(configuration.Get("USER_SERVICE_URL")+"/users", data, &userResponse)
 	return userResponse, err
 }
 
-func CreateAccount(ctx context.Context, data model.AccountRequest) (model.AccountResponse, error) {
-	var accountResponse model.AccountResponse
-	err := makeRequest("http://localhost:8081/account-service/accounts", data, &accountResponse)
+func CreateAccount(ctx context.Context, data request.Account) (response.Account, error) {
+	var accountResponse response.Account
+	err := makeRequest(configuration.Get("ACCOUNT_SERVICE_URL")+"/accounts", data, &accountResponse)
 	return accountResponse, err
 }
 
-func CreateAgreement(ctx context.Context, data model.AgreementRequest) (model.AgreementResponse, error) {
-	var agreementResponse model.AgreementResponse
-	err := makeRequest("http://localhost:8081/agreement-service/agreements", data, &agreementResponse)
+func CreateAgreement(ctx context.Context, data request.Agreement) (response.Agreement, error) {
+	var agreementResponse response.Agreement
+	err := makeRequest(configuration.Get("AGREEMENT_SERVICE_URL")+"/agreements", data, &agreementResponse)
 	return agreementResponse, err
 }
 
-func CreateSignature(ctx context.Context, data model.SignatureRequest) (model.SignatureResponse, error) {
-	var signatureResponse model.SignatureResponse
-	err := makeRequest("http://localhost:8081/signature-service/signatures", data, &signatureResponse)
+func ValidateSignature(ctx context.Context, data request.Signature) (response.Signature, error) {
+	var signatureResponse response.Signature
+	err := makeRequest(configuration.Get("SIGNATURE_SERVICE_URL")+"/signatures", data, &signatureResponse)
 	return signatureResponse, err
 }
 
-func CreateCard(ctx context.Context, data model.CardRequest) (model.CardResponse, error) {
-	var cardResponse model.CardResponse
-	err := makeRequest("http://localhost:8081/card-service/cards", data, &cardResponse)
+func CreateCard(ctx context.Context, data request.Card) (response.Card, error) {
+	var cardResponse response.Card
+	err := makeRequest(configuration.Get("CARD_SERVICE_URL")+"/cards", data, &cardResponse)
 	if err == nil {
-		cardResponse.Cvv = "***"
-		cardResponse.Number = maskPAN(cardResponse.Number)
-		return cardResponse, err
+		cardResponse.Cvv = "***" // Mask CVV
+		cardResponse.Number = util.MaskPan(cardResponse.Number)
 	}
 	return cardResponse, err
-}
-
-func maskPAN(pan string) string {
-	if len(pan) <= 10 {
-		return pan
-	}
-	return pan[0:6] + strings.Repeat("*", len(pan)-10) + pan[len(pan)-4:]
 }
