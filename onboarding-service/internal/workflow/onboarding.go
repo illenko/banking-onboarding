@@ -15,13 +15,12 @@ import (
 	"go.temporal.io/sdk/workflow"
 )
 
-const (
-	AccountTypePersonal = "personal"
-	CurrencyUAH         = "UAH"
-)
-
 func Onboarding(ctx workflow.Context, input input.Onboarding) (output.Onboarding, error) {
 	logger := workflow.GetLogger(ctx)
+
+	workflowId := workflow.GetInfo(ctx).WorkflowExecution.ID
+
+	logger.Info("Starting onboarding workflow", "WorkflowID", workflowId)
 
 	options := getDefaultActivityOptions()
 
@@ -47,7 +46,7 @@ func Onboarding(ctx workflow.Context, input input.Onboarding) (output.Onboarding
 
 	// 1. Execute antifraud checks
 	logger.Info("Executing antifraud checks for user", "Email", userInput.Email)
-	antifraudChecksResult, err := executeActivity[request.User, response.Antifraud](ctx, activity.AntifraudChecks, userInput)
+	antifraudChecksResult, err := executeActivity[request.Base, response.Antifraud](ctx, activity.AntifraudChecks, toBaseRequest(workflowId, userInput))
 
 	if err != nil {
 		currentState = output.Onboarding{State: state.FailedState}
@@ -63,7 +62,7 @@ func Onboarding(ctx workflow.Context, input input.Onboarding) (output.Onboarding
 
 	// 2. Create user
 	logger.Info("Creating user", "Email", userInput.Email)
-	createUserResult, err := executeActivity[request.User, response.User](ctx, activity.CreateUser, userInput)
+	createUserResult, err := executeActivity[request.Base, response.User](ctx, activity.CreateUser, toBaseRequest(workflowId, userInput))
 	if err != nil {
 		logger.Error("Unable to create user", "Email", userInput.Email)
 		currentState = output.Onboarding{State: state.FailedState}
@@ -74,11 +73,11 @@ func Onboarding(ctx workflow.Context, input input.Onboarding) (output.Onboarding
 	logger.Info("Creating account for user", "UserID", createUserResult.ID)
 	accountInput := request.Account{
 		UserID:   createUserResult.ID,
-		Type:     AccountTypePersonal,
-		Currency: CurrencyUAH,
+		Type:     input.AccountType,
+		Currency: input.Currency,
 	}
 
-	createAccountResult, err := executeActivity[request.Account, response.Account](ctx, activity.CreateAccount, accountInput)
+	createAccountResult, err := executeActivity[request.Base, response.Account](ctx, activity.CreateAccount, toBaseRequest(workflowId, accountInput))
 	if err != nil {
 		logger.Error("Unable to create account", "UserID", createUserResult.ID)
 		currentState = output.Onboarding{State: state.FailedState}
@@ -92,7 +91,7 @@ func Onboarding(ctx workflow.Context, input input.Onboarding) (output.Onboarding
 		AccountID: createAccountResult.ID,
 	}
 
-	createAgreementResult, err := executeActivity[request.Agreement, response.Agreement](ctx, activity.CreateAgreement, agreementInput)
+	createAgreementResult, err := executeActivity[request.Base, response.Agreement](ctx, activity.CreateAgreement, toBaseRequest(workflowId, agreementInput))
 	if err != nil {
 		currentState = output.Onboarding{State: state.FailedState}
 		return currentState, err
@@ -116,7 +115,7 @@ func Onboarding(ctx workflow.Context, input input.Onboarding) (output.Onboarding
 		Signature:   signatureSignal.Signature,
 	}
 
-	signatureResult, err := executeActivity[request.Signature, response.Signature](ctx, activity.ValidateSignature, signatureInput)
+	signatureResult, err := executeActivity[request.Base, response.Signature](ctx, activity.ValidateSignature, toBaseRequest(workflowId, signatureInput))
 	if err != nil {
 		logger.Error("Unable to validate signature", "AgreementID", createAgreementResult.ID)
 		currentState = output.Onboarding{State: state.FailedState}
@@ -138,7 +137,7 @@ func Onboarding(ctx workflow.Context, input input.Onboarding) (output.Onboarding
 		AccountID: createAccountResult.ID,
 	}
 
-	createCardResult, err := executeActivity[request.Card, response.Card](ctx, activity.CreateCard, cardInput)
+	createCardResult, err := executeActivity[request.Base, response.Card](ctx, activity.CreateCard, toBaseRequest(workflowId, cardInput))
 	if err != nil {
 		logger.Error("Unable to create card", "AccountID", createAccountResult.ID)
 		currentState = output.Onboarding{State: state.FailedState}
@@ -181,5 +180,12 @@ func toFinalState(accountResult response.Account, cardResult response.Card) outp
 			"account": accountResult,
 			"card":    cardResult,
 		},
+	}
+}
+
+func toBaseRequest(workflowId string, body any) request.Base {
+	return request.Base{
+		Headers: map[string]string{"X-Request-Id": workflowId},
+		Body:    body,
 	}
 }

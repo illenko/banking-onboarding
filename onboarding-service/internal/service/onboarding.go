@@ -31,20 +31,17 @@ func NewOnboardingService(temporalClient client.Client) *OnboardingServiceImpl {
 }
 
 func (s *OnboardingServiceImpl) CreateOnboarding(ctx context.Context, req *http.OnboardingRequest) (http.OnboardingStatus, error) {
-	id := uuid.New()
+	workflowId := uuid.New()
 
-	onboardingInput := input.Onboarding{
-		ID:        id,
+	go s.executeOnboardingWorkflow(ctx, workflowId.String(), input.Onboarding{
 		FirstName: req.FirstName,
 		LastName:  req.LastName,
 		Email:     req.Email,
 		City:      req.City,
-	}
-
-	go s.executeOnboardingWorkflow(ctx, id.String(), onboardingInput)
+	})
 
 	return http.OnboardingStatus{
-		ID:    id,
+		ID:    workflowId,
 		State: state.ProcessingState,
 	}, nil
 }

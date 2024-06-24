@@ -6,6 +6,8 @@ import (
 
 func main() {
 	router := gin.Default()
+	router.Use(RequestLogger())
+	router.Use(ResponseLogger())
 	router.Use(RandomErrorMiddleware())
 
 	router.POST("/antifraud-service/checks", antifraudChecksHandler)

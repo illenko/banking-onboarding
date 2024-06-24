@@ -28,3 +28,8 @@ type Account struct {
 type Card struct {
 	AccountID uuid.UUID `json:"account_id"`
 }
+
+type Base struct {
+	Headers map[string]string
+	Body    any
+}
