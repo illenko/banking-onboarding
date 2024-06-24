@@ -3,11 +3,10 @@ package app
 import (
 	"log/slog"
 
-	"github.com/illenko/onboarding-service/internal/configuration"
+	"github.com/illenko/onboarding-common/configuration"
 	"github.com/illenko/onboarding-service/internal/handler"
 	"github.com/illenko/onboarding-service/internal/server"
 	"github.com/illenko/onboarding-service/internal/service"
-	"github.com/illenko/onboarding-service/internal/worker"
 	"go.temporal.io/sdk/client"
 )
 
@@ -19,7 +18,6 @@ func Run() {
 	}
 	defer temporalClient.Close()
 	configuration.LoadEnv()
-	go worker.Run(temporalClient)
 
 	onboardingService := service.NewOnboardingService(temporalClient)
 	onboardingHandler := handler.NewOnboardingHandler(onboardingService)

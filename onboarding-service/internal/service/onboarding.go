@@ -5,14 +5,14 @@ import (
 	"log/slog"
 
 	"github.com/google/uuid"
-	"github.com/illenko/onboarding-service/internal/input"
-	"github.com/illenko/onboarding-service/internal/output"
-	"github.com/illenko/onboarding-service/internal/query"
-	"github.com/illenko/onboarding-service/internal/queue"
-	"github.com/illenko/onboarding-service/internal/signal"
-	"github.com/illenko/onboarding-service/internal/workflow"
+	"github.com/illenko/onboarding-common/input"
+	"github.com/illenko/onboarding-common/output"
+	"github.com/illenko/onboarding-common/query"
+	"github.com/illenko/onboarding-common/queue"
+	"github.com/illenko/onboarding-common/signal"
+	"github.com/illenko/onboarding-common/state"
+	"github.com/illenko/onboarding-common/workflow"
 	"github.com/illenko/onboarding-service/pkg/http"
-	"github.com/illenko/onboarding-service/pkg/state"
 	"go.temporal.io/sdk/client"
 )
 
@@ -34,10 +34,12 @@ func (s *OnboardingServiceImpl) CreateOnboarding(ctx context.Context, req *http.
 	workflowId := uuid.New()
 
 	go s.executeOnboardingWorkflow(ctx, workflowId.String(), input.Onboarding{
-		FirstName: req.FirstName,
-		LastName:  req.LastName,
-		Email:     req.Email,
-		City:      req.City,
+		FirstName:   req.FirstName,
+		LastName:    req.LastName,
+		Email:       req.Email,
+		City:        req.City,
+		AccountType: req.AccountType,
+		Currency:    req.Currency,
 	})
 
 	return http.OnboardingStatus{

@@ -3,12 +3,11 @@ package activity
 import (
 	"context"
 
-	"github.com/illenko/onboarding-service/internal/configuration"
-
 	"github.com/go-resty/resty/v2"
-	"github.com/illenko/onboarding-service/internal/request"
-	"github.com/illenko/onboarding-service/internal/response"
-	"github.com/illenko/onboarding-service/internal/util"
+	"github.com/illenko/onboarding-common/configuration"
+	"github.com/illenko/onboarding-common/request"
+	"github.com/illenko/onboarding-common/response"
+	"github.com/illenko/onboarding-common/util"
 )
 
 type RequestError struct{}

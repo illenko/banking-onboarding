@@ -3,14 +3,15 @@ package workflow
 import (
 	"time"
 
-	"github.com/illenko/onboarding-service/internal/activity"
-	"github.com/illenko/onboarding-service/internal/input"
-	"github.com/illenko/onboarding-service/internal/output"
-	"github.com/illenko/onboarding-service/internal/query"
-	"github.com/illenko/onboarding-service/internal/request"
-	"github.com/illenko/onboarding-service/internal/response"
-	"github.com/illenko/onboarding-service/internal/signal"
-	"github.com/illenko/onboarding-service/pkg/state"
+	"github.com/illenko/onboarding-common/activity"
+	"github.com/illenko/onboarding-common/input"
+	"github.com/illenko/onboarding-common/output"
+	"github.com/illenko/onboarding-common/query"
+	"github.com/illenko/onboarding-common/request"
+	"github.com/illenko/onboarding-common/response"
+	"github.com/illenko/onboarding-common/signal"
+	"github.com/illenko/onboarding-common/state"
+
 	"go.temporal.io/sdk/temporal"
 	"go.temporal.io/sdk/workflow"
 )
