@@ -21,6 +21,8 @@ const (
 )
 
 func Onboarding(ctx workflow.Context, input input.Onboarding) (output.Onboarding, error) {
+	logger := workflow.GetLogger(ctx)
+
 	options := getDefaultActivityOptions()
 
 	currentState := output.Onboarding{State: state.ProcessingState}
@@ -44,6 +46,7 @@ func Onboarding(ctx workflow.Context, input input.Onboarding) (output.Onboarding
 	}
 
 	// 1. Execute antifraud checks
+	logger.Info("Executing antifraud checks for user", "Email", userInput.Email)
 	antifraudChecksResult, err := executeActivity[request.User, response.Antifraud](ctx, activity.AntifraudChecks, userInput)
 
 	if err != nil {
@@ -53,18 +56,22 @@ func Onboarding(ctx workflow.Context, input input.Onboarding) (output.Onboarding
 
 	// If antifraud checks failed, return fraud_not_passed state
 	if !antifraudChecksResult.Passed {
+		logger.Warn("User did not pass antifraud checks", "Email", userInput.Email)
 		currentState = output.Onboarding{State: state.FraudNotPassedState}
 		return currentState, nil
 	}
 
 	// 2. Create user
+	logger.Info("Creating user", "Email", userInput.Email)
 	createUserResult, err := executeActivity[request.User, response.User](ctx, activity.CreateUser, userInput)
 	if err != nil {
+		logger.Error("Unable to create user", "Email", userInput.Email)
 		currentState = output.Onboarding{State: state.FailedState}
 		return currentState, err
 	}
 
 	// 3. Create account
+	logger.Info("Creating account for user", "UserID", createUserResult.ID)
 	accountInput := request.Account{
 		UserID:   createUserResult.ID,
 		Type:     AccountTypePersonal,
@@ -73,11 +80,13 @@ func Onboarding(ctx workflow.Context, input input.Onboarding) (output.Onboarding
 
 	createAccountResult, err := executeActivity[request.Account, response.Account](ctx, activity.CreateAccount, accountInput)
 	if err != nil {
+		logger.Error("Unable to create account", "UserID", createUserResult.ID)
 		currentState = output.Onboarding{State: state.FailedState}
 		return currentState, err
 	}
 
 	// 4. Create agreement
+	logger.Info("Creating agreement for user", "UserID", createUserResult.ID, "AccountID", createAccountResult.ID)
 	agreementInput := request.Agreement{
 		UserID:    createUserResult.ID,
 		AccountID: createAccountResult.ID,
@@ -90,6 +99,7 @@ func Onboarding(ctx workflow.Context, input input.Onboarding) (output.Onboarding
 	}
 
 	// 5. Wait for signature
+	logger.Info("Waiting for agreement signature", "AgreementID", createAgreementResult.ID)
 	currentState = output.Onboarding{
 		State: state.WaitingForAgreementSignatureState,
 		Data:  map[string]any{"link": createAgreementResult.Link},
@@ -108,12 +118,14 @@ func Onboarding(ctx workflow.Context, input input.Onboarding) (output.Onboarding
 
 	signatureResult, err := executeActivity[request.Signature, response.Signature](ctx, activity.ValidateSignature, signatureInput)
 	if err != nil {
+		logger.Error("Unable to validate signature", "AgreementID", createAgreementResult.ID)
 		currentState = output.Onboarding{State: state.FailedState}
 		return currentState, err
 	}
 
 	// If signature is not valid, return signature_not_valid state
 	if !signatureResult.Valid {
+		logger.Warn("Signature is not valid", "AgreementID", createAgreementResult.ID)
 		currentState = output.Onboarding{State: state.SignatureNotValidSate}
 		return currentState, nil
 	}
@@ -121,16 +133,20 @@ func Onboarding(ctx workflow.Context, input input.Onboarding) (output.Onboarding
 	currentState = output.Onboarding{State: state.ProcessingState}
 
 	// 6. Create card
+	logger.Info("Creating card for account", "AccountID", createAccountResult.ID)
 	cardInput := request.Card{
 		AccountID: createAccountResult.ID,
 	}
 
 	createCardResult, err := executeActivity[request.Card, response.Card](ctx, activity.CreateCard, cardInput)
 	if err != nil {
+		logger.Error("Unable to create card", "AccountID", createAccountResult.ID)
 		currentState = output.Onboarding{State: state.FailedState}
 		return currentState, err
 	}
 
+	// 7. Onboarding completed
+	logger.Info("Onboarding completed", "UserID", createUserResult.ID, "AccountID", createAccountResult.ID, "CardID", createCardResult.ID)
 	currentState = toFinalState(createAccountResult, createCardResult)
 
 	return currentState, nil

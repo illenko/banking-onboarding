@@ -1,7 +1,7 @@
 package app
 
 import (
-	"log"
+	"log/slog"
 
 	"github.com/illenko/onboarding-service/internal/configuration"
 	"github.com/illenko/onboarding-service/internal/handler"
@@ -12,21 +12,21 @@ import (
 )
 
 func Run() {
-	configuration.LoadEnv()
-	go worker.Run()
-
 	temporalClient, err := client.Dial(client.Options{})
 	if err != nil {
-		log.Fatalln("Unable to create Temporal client:", err)
+		slog.Error("Unable to create Temporal client:", slog.String("error", err.Error()))
+		return
 	}
 	defer temporalClient.Close()
+	configuration.LoadEnv()
+	go worker.Run(temporalClient)
 
 	onboardingService := service.NewOnboardingService(temporalClient)
 	onboardingHandler := handler.NewOnboardingHandler(onboardingService)
 
 	err = server.New(onboardingHandler).Run(":" + configuration.Get("SERVER_PORT"))
 	if err != nil {
-		log.Fatalln("Unable to start the server:", err)
+		slog.Error("Unable to start the server:", slog.String("error", err.Error()))
 		return
 	}
 }

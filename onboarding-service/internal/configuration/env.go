@@ -1,7 +1,7 @@
 package configuration
 
 import (
-	"log"
+	"log/slog"
 	"os"
 	"path/filepath"
 
@@ -11,11 +11,12 @@ import (
 func LoadEnv() {
 
 	dir, err := os.Getwd()
-	path := dir + "/.env"
 
 	if err != nil {
-		log.Println("Not able to get current working director")
+		slog.Warn("Unable to get current working directory")
 	}
+
+	path := dir + "/.env"
 
 	if _, err := os.Stat(path); os.IsNotExist(err) {
 		dir = filepath.Dir(dir)
@@ -23,7 +24,7 @@ func LoadEnv() {
 	}
 
 	if err := godotenv.Load(path); err != nil {
-		log.Println("No .env file found in path " + path)
+		slog.Warn("No .env file found in path", slog.String("path", path))
 	}
 }
 

@@ -1,7 +1,7 @@
 package worker
 
 import (
-	"log"
+	"log/slog"
 
 	"github.com/illenko/onboarding-service/internal/activity"
 	"github.com/illenko/onboarding-service/internal/queue"
@@ -10,14 +10,9 @@ import (
 	"go.temporal.io/sdk/worker"
 )
 
-func Run() {
-	c, err := client.Dial(client.Options{})
-	if err != nil {
-		log.Fatalln("Unable to create Temporal client.", err)
-	}
-	defer c.Close()
+func Run(temporalClient client.Client) {
 
-	w := worker.New(c, queue.OnboardingTask, worker.Options{})
+	w := worker.New(temporalClient, queue.OnboardingTask, worker.Options{})
 
 	w.RegisterWorkflow(workflow.Onboarding)
 	w.RegisterActivity(activity.AntifraudChecks)
@@ -27,9 +22,10 @@ func Run() {
 	w.RegisterActivity(activity.ValidateSignature)
 	w.RegisterActivity(activity.CreateCard)
 
-	err = w.Run(worker.InterruptCh())
+	err := w.Run(worker.InterruptCh())
 	if err != nil {
-		log.Fatalln("unable to start Worker", err)
+		slog.Error("Unable to start worker", slog.String("error", err.Error()))
+		return
 	}
 
 }
