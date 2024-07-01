@@ -1,0 +1,231 @@
+{
+    "swagger": "2.0",
+    "info": {
+        "title": "Onboarding Service",
+        "contact": {},
+        "version": "1.0"
+    },
+    "paths": {
+        "/onboarding": {
+            "post": {
+                "description": "Create onboarding",
+                "consumes": [
+                    "application/json"
+                ],
+                "produces": [
+                    "application/json"
+                ],
+                "tags": [
+                    "onboarding"
+                ],
+                "summary": "Create onboarding",
+                "parameters": [
+                    {
+                        "description": "Onboarding request",
+                        "name": "request",
+                        "in": "body",
+                        "required": true,
+                        "schema": {
+                            "$ref": "#/definitions/http.OnboardingRequest"
+                        }
+                    }
+                ],
+                "responses": {
+                    "200": {
+                        "description": "OK",
+                        "schema": {
+                            "$ref": "#/definitions/http.OnboardingStatus"
+                        }
+                    },
+                    "400": {
+                        "description": "Bad Request",
+                        "schema": {
+                            "$ref": "#/definitions/http.ErrorResponse"
+                        }
+                    },
+                    "500": {
+                        "description": "Internal Server Error",
+                        "schema": {
+                            "$ref": "#/definitions/http.ErrorResponse"
+                        }
+                    }
+                }
+            }
+        },
+        "/onboarding/{id}": {
+            "get": {
+                "description": "Get onboarding",
+                "consumes": [
+                    "application/json"
+                ],
+                "produces": [
+                    "application/json"
+                ],
+                "tags": [
+                    "onboarding"
+                ],
+                "summary": "Get onboarding",
+                "parameters": [
+                    {
+                        "type": "string",
+                        "description": "Onboarding ID",
+                        "name": "id",
+                        "in": "path",
+                        "required": true
+                    }
+                ],
+                "responses": {
+                    "200": {
+                        "description": "OK",
+                        "schema": {
+                            "$ref": "#/definitions/http.OnboardingStatus"
+                        }
+                    },
+                    "400": {
+                        "description": "Bad Request",
+                        "schema": {
+                            "$ref": "#/definitions/http.ErrorResponse"
+                        }
+                    },
+                    "500": {
+                        "description": "Internal Server Error",
+                        "schema": {
+                            "$ref": "#/definitions/http.ErrorResponse"
+                        }
+                    }
+                }
+            }
+        },
+        "/onboarding/{id}/signature": {
+            "post": {
+                "description": "Verify signature",
+                "consumes": [
+                    "application/json"
+                ],
+                "produces": [
+                    "application/json"
+                ],
+                "tags": [
+                    "onboarding"
+                ],
+                "summary": "Verify signature",
+                "parameters": [
+                    {
+                        "type": "string",
+                        "description": "Onboarding ID",
+                        "name": "id",
+                        "in": "path",
+                        "required": true
+                    },
+                    {
+                        "description": "Signature request",
+                        "name": "request",
+                        "in": "body",
+                        "required": true,
+                        "schema": {
+                            "$ref": "#/definitions/http.SignatureRequest"
+                        }
+                    }
+                ],
+                "responses": {
+                    "200": {
+                        "description": "OK",
+                        "schema": {
+                            "$ref": "#/definitions/http.OnboardingStatus"
+                        }
+                    },
+                    "400": {
+                        "description": "Bad Request",
+                        "schema": {
+                            "$ref": "#/definitions/http.ErrorResponse"
+                        }
+                    },
+                    "500": {
+                        "description": "Internal Server Error",
+                        "schema": {
+                            "$ref": "#/definitions/http.ErrorResponse"
+                        }
+                    }
+                }
+            }
+        }
+    },
+    "definitions": {
+        "http.ErrorResponse": {
+            "type": "object",
+            "properties": {
+                "code": {
+                    "type": "string"
+                },
+                "message": {
+                    "type": "string"
+                }
+            }
+        },
+        "http.OnboardingRequest": {
+            "type": "object",
+            "properties": {
+                "account_type": {
+                    "type": "string"
+                },
+                "city": {
+                    "type": "string"
+                },
+                "currency": {
+                    "type": "string"
+                },
+                "email": {
+                    "type": "string"
+                },
+                "first_name": {
+                    "type": "string"
+                },
+                "last_name": {
+                    "type": "string"
+                }
+            }
+        },
+        "http.OnboardingStatus": {
+            "type": "object",
+            "properties": {
+                "data": {
+                    "type": "object",
+                    "additionalProperties": {}
+                },
+                "id": {
+                    "type": "string"
+                },
+                "state": {
+                    "$ref": "#/definitions/state.OnboardingState"
+                }
+            }
+        },
+        "http.SignatureRequest": {
+            "type": "object",
+            "properties": {
+                "signature": {
+                    "type": "string"
+                }
+            }
+        },
+        "state.OnboardingState": {
+            "type": "string",
+            "enum": [
+                "processing",
+                "failed",
+                "fraud_not_passed",
+                "signature_not_valid",
+                "waiting_for_agreement_signature",
+                "completed"
+            ],
+            "x-enum-varnames": [
+                "ProcessingState",
+                "FailedState",
+                "FraudNotPassedState",
+                "SignatureNotValidSate",
+                "WaitingForAgreementSignatureState",
+                "CompletedState"
+            ]
+        }
+    }
+}

@@ -1,0 +1,154 @@
+definitions:
+  http.ErrorResponse:
+    properties:
+      code:
+        type: string
+      message:
+        type: string
+    type: object
+  http.OnboardingRequest:
+    properties:
+      account_type:
+        type: string
+      city:
+        type: string
+      currency:
+        type: string
+      email:
+        type: string
+      first_name:
+        type: string
+      last_name:
+        type: string
+    type: object
+  http.OnboardingStatus:
+    properties:
+      data:
+        additionalProperties: {}
+        type: object
+      id:
+        type: string
+      state:
+        $ref: '#/definitions/state.OnboardingState'
+    type: object
+  http.SignatureRequest:
+    properties:
+      signature:
+        type: string
+    type: object
+  state.OnboardingState:
+    enum:
+    - processing
+    - failed
+    - fraud_not_passed
+    - signature_not_valid
+    - waiting_for_agreement_signature
+    - completed
+    type: string
+    x-enum-varnames:
+    - ProcessingState
+    - FailedState
+    - FraudNotPassedState
+    - SignatureNotValidSate
+    - WaitingForAgreementSignatureState
+    - CompletedState
+info:
+  contact: {}
+  title: Onboarding Service
+  version: "1.0"
+paths:
+  /onboarding:
+    post:
+      consumes:
+      - application/json
+      description: Create onboarding
+      parameters:
+      - description: Onboarding request
+        in: body
+        name: request
+        required: true
+        schema:
+          $ref: '#/definitions/http.OnboardingRequest'
+      produces:
+      - application/json
+      responses:
+        "200":
+          description: OK
+          schema:
+            $ref: '#/definitions/http.OnboardingStatus'
+        "400":
+          description: Bad Request
+          schema:
+            $ref: '#/definitions/http.ErrorResponse'
+        "500":
+          description: Internal Server Error
+          schema:
+            $ref: '#/definitions/http.ErrorResponse'
+      summary: Create onboarding
+      tags:
+      - onboarding
+  /onboarding/{id}:
+    get:
+      consumes:
+      - application/json
+      description: Get onboarding
+      parameters:
+      - description: Onboarding ID
+        in: path
+        name: id
+        required: true
+        type: string
+      produces:
+      - application/json
+      responses:
+        "200":
+          description: OK
+          schema:
+            $ref: '#/definitions/http.OnboardingStatus'
+        "400":
+          description: Bad Request
+          schema:
+            $ref: '#/definitions/http.ErrorResponse'
+        "500":
+          description: Internal Server Error
+          schema:
+            $ref: '#/definitions/http.ErrorResponse'
+      summary: Get onboarding
+      tags:
+      - onboarding
+  /onboarding/{id}/signature:
+    post:
+      consumes:
+      - application/json
+      description: Verify signature
+      parameters:
+      - description: Onboarding ID
+        in: path
+        name: id
+        required: true
+        type: string
+      - description: Signature request
+        in: body
+        name: request
+        required: true
+        schema:
+          $ref: '#/definitions/http.SignatureRequest'
+      produces:
+      - application/json
+      responses:
+        "200":
+          description: OK
+          schema:
+            $ref: '#/definitions/http.OnboardingStatus'
+        "400":
+          description: Bad Request
+          schema:
+            $ref: '#/definitions/http.ErrorResponse'
+        "500":
+          description: Internal Server Error
+          schema:
+            $ref: '#/definitions/http.ErrorResponse'
+      summary: Verify signature
+      tags:
+      - onboarding
+swagger: "2.0"
