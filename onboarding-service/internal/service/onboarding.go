@@ -16,24 +16,23 @@ import (
 	"go.temporal.io/sdk/client"
 )
 
-type OnboardingService interface {
-	CreateOnboarding(ctx context.Context, req *http.OnboardingRequest) (http.OnboardingStatus, error)
-	GetOnboarding(ctx context.Context, id uuid.UUID) (http.OnboardingStatus, error)
-	VerifySignature(ctx context.Context, id uuid.UUID, req *http.SignatureRequest) (http.OnboardingStatus, error)
-}
-
-type OnboardingServiceImpl struct {
+type OnboardingService struct {
 	temporalClient client.Client
 }
 
-func NewOnboardingService(temporalClient client.Client) *OnboardingServiceImpl {
-	return &OnboardingServiceImpl{temporalClient: temporalClient}
+func NewOnboardingService(temporalClient client.Client) *OnboardingService {
+	return &OnboardingService{temporalClient: temporalClient}
 }
 
-func (s *OnboardingServiceImpl) CreateOnboarding(ctx context.Context, req *http.OnboardingRequest) (http.OnboardingStatus, error) {
+func (s *OnboardingService) CreateOnboarding(ctx context.Context, req *http.OnboardingRequest) (http.OnboardingStatus, error) {
 	workflowId := uuid.New()
 
-	go s.executeOnboardingWorkflow(ctx, workflowId.String(), input.Onboarding{
+	options := client.StartWorkflowOptions{
+		ID:        workflowId.String(),
+		TaskQueue: queue.OnboardingTask,
+	}
+
+	_, err := s.temporalClient.ExecuteWorkflow(ctx, options, workflow.Onboarding, input.Onboarding{
 		FirstName:   req.FirstName,
 		LastName:    req.LastName,
 		Email:       req.Email,
@@ -41,6 +40,15 @@ func (s *OnboardingServiceImpl) CreateOnboarding(ctx context.Context, req *http.
 		AccountType: req.AccountType,
 		Currency:    req.Currency,
 	})
+	if err != nil {
+		slog.ErrorContext(ctx, "Unable to start the Workflow:", slog.String("Error", err.Error()))
+
+		return http.OnboardingStatus{
+			ID:    workflowId,
+			State: state.FailedState,
+		}, nil
+
+	}
 
 	return http.OnboardingStatus{
 		ID:    workflowId,
@@ -48,7 +56,7 @@ func (s *OnboardingServiceImpl) CreateOnboarding(ctx context.Context, req *http.
 	}, nil
 }
 
-func (s *OnboardingServiceImpl) GetOnboarding(ctx context.Context, id uuid.UUID) (http.OnboardingStatus, error) {
+func (s *OnboardingService) GetOnboarding(ctx context.Context, id uuid.UUID) (http.OnboardingStatus, error) {
 	currentState, err := s.getCurrentState(ctx, id)
 
 	if err != nil {
@@ -62,7 +70,7 @@ func (s *OnboardingServiceImpl) GetOnboarding(ctx context.Context, id uuid.UUID)
 	}, nil
 }
 
-func (s *OnboardingServiceImpl) VerifySignature(ctx context.Context, id uuid.UUID, req *http.SignatureRequest) (http.OnboardingStatus, error) {
+func (s *OnboardingService) VerifySignature(ctx context.Context, id uuid.UUID, req *http.SignatureRequest) (http.OnboardingStatus, error) {
 	currentState, err := s.getCurrentState(ctx, id)
 
 	if err != nil {
@@ -93,28 +101,7 @@ func (s *OnboardingServiceImpl) VerifySignature(ctx context.Context, id uuid.UUI
 	}, nil
 }
 
-func (s *OnboardingServiceImpl) executeOnboardingWorkflow(ctx context.Context, workflowID string, onboardingInput input.Onboarding) {
-	options := client.StartWorkflowOptions{
-		ID:        workflowID,
-		TaskQueue: queue.OnboardingTask,
-	}
-
-	we, err := s.temporalClient.ExecuteWorkflow(ctx, options, workflow.Onboarding, onboardingInput)
-	if err != nil {
-		slog.ErrorContext(ctx, "Unable to start the Workflow:", slog.String("Error", err.Error()))
-		return
-	}
-
-	var result output.Onboarding
-	err = we.Get(ctx, &result)
-
-	if err != nil {
-		slog.ErrorContext(ctx, "Unable to get the Workflow result:", slog.String("Error", err.Error()))
-		return
-	}
-}
-
-func (s *OnboardingServiceImpl) getCurrentState(ctx context.Context, id uuid.UUID) (output.Onboarding, error) {
+func (s *OnboardingService) getCurrentState(ctx context.Context, id uuid.UUID) (output.Onboarding, error) {
 	response, err := s.temporalClient.QueryWorkflow(ctx, id.String(), "", query.CurrentState)
 	if err != nil {
 		return output.Onboarding{}, err

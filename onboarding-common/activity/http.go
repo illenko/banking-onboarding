@@ -39,7 +39,6 @@ func ValidateSignature(ctx context.Context, req request.Base) (response.Signatur
 func CreateCard(ctx context.Context, req request.Base) (response.Card, error) {
 	cardResponse, err := httpActivity[response.Card](ctx, configuration.Get("CARD_SERVICE_URL")+"/cards", req)
 	if err == nil {
-		cardResponse.Cvv = "***" // Mask CVV
 		cardResponse.Number = util.MaskPan(cardResponse.Number)
 	}
 	return cardResponse, err

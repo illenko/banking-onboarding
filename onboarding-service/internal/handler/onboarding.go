@@ -1,26 +1,26 @@
 package handler
 
 import (
+	"context"
 	"net/http"
 
 	"github.com/gin-gonic/gin"
 	"github.com/google/uuid"
-	"github.com/illenko/onboarding-service/internal/service"
 	httpModel "github.com/illenko/onboarding-service/pkg/http"
 )
 
-type OnboardingHandler interface {
-	CreateOnboarding(c *gin.Context)
-	GetOnboarding(c *gin.Context)
-	VerifySignature(c *gin.Context)
+type onboardingService interface {
+	CreateOnboarding(ctx context.Context, req *httpModel.OnboardingRequest) (httpModel.OnboardingStatus, error)
+	GetOnboarding(ctx context.Context, id uuid.UUID) (httpModel.OnboardingStatus, error)
+	VerifySignature(ctx context.Context, id uuid.UUID, req *httpModel.SignatureRequest) (httpModel.OnboardingStatus, error)
 }
 
-type OnboardingHandlerImpl struct {
-	service service.OnboardingService
+type OnboardingHandler struct {
+	service onboardingService
 }
 
-func NewOnboardingHandler(service service.OnboardingService) *OnboardingHandlerImpl {
-	return &OnboardingHandlerImpl{service: service}
+func NewOnboardingHandler(service onboardingService) *OnboardingHandler {
+	return &OnboardingHandler{service: service}
 }
 
 // CreateOnboarding godoc
@@ -34,7 +34,7 @@ func NewOnboardingHandler(service service.OnboardingService) *OnboardingHandlerI
 // @Failure 400 {object} http.ErrorResponse
 // @Failure 500 {object} http.ErrorResponse
 // @Router /onboarding [post]
-func (h *OnboardingHandlerImpl) CreateOnboarding(c *gin.Context) {
+func (h *OnboardingHandler) CreateOnboarding(c *gin.Context) {
 	var request httpModel.OnboardingRequest
 	if !bindRequest(c, &request) {
 		return
@@ -60,7 +60,7 @@ func (h *OnboardingHandlerImpl) CreateOnboarding(c *gin.Context) {
 // @Failure 400 {object} http.ErrorResponse
 // @Failure 500 {object} http.ErrorResponse
 // @Router /onboarding/{id} [get]
-func (h *OnboardingHandlerImpl) GetOnboarding(c *gin.Context) {
+func (h *OnboardingHandler) GetOnboarding(c *gin.Context) {
 	id, err := uuid.Parse(c.Param("id"))
 	if err != nil {
 		sendErrorResponse(c, http.StatusBadRequest, "Invalid request")
@@ -88,7 +88,7 @@ func (h *OnboardingHandlerImpl) GetOnboarding(c *gin.Context) {
 // @Failure 400 {object} http.ErrorResponse
 // @Failure 500 {object} http.ErrorResponse
 // @Router /onboarding/{id}/signature [post]
-func (h *OnboardingHandlerImpl) VerifySignature(c *gin.Context) {
+func (h *OnboardingHandler) VerifySignature(c *gin.Context) {
 	id, err := uuid.Parse(c.Param("id"))
 	if err != nil {
 		sendErrorResponse(c, http.StatusBadRequest, "Invalid request")

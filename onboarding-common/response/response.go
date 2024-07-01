@@ -45,5 +45,4 @@ type Card struct {
 	AccountID uuid.UUID `json:"account_id"`
 	Number    string    `json:"number"`
 	Expire    string    `json:"expire"`
-	Cvv       string    `json:"cvv"`
 }

@@ -11,7 +11,6 @@ import (
 	"github.com/illenko/onboarding-common/response"
 	"github.com/illenko/onboarding-common/signal"
 	"github.com/illenko/onboarding-common/state"
-
 	"go.temporal.io/sdk/temporal"
 	"go.temporal.io/sdk/workflow"
 )

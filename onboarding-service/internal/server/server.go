@@ -3,17 +3,22 @@ package server
 import (
 	"github.com/gin-gonic/gin"
 	"github.com/illenko/onboarding-service/docs"
-	"github.com/illenko/onboarding-service/internal/handler"
 	swaggerfiles "github.com/swaggo/files"
 	ginSwagger "github.com/swaggo/gin-swagger"
 )
 
-func New(onboardingHandler handler.OnboardingHandler) *gin.Engine {
+type onboardingHandler interface {
+	CreateOnboarding(c *gin.Context)
+	GetOnboarding(c *gin.Context)
+	VerifySignature(c *gin.Context)
+}
+
+func New(handler onboardingHandler) *gin.Engine {
 	router := gin.Default()
 
-	router.POST("/onboarding", onboardingHandler.CreateOnboarding)
-	router.POST("/onboarding/:id/signature", onboardingHandler.VerifySignature)
-	router.GET("/onboarding/:id", onboardingHandler.GetOnboarding)
+	router.POST("/onboarding", handler.CreateOnboarding)
+	router.POST("/onboarding/:id/signature", handler.VerifySignature)
+	router.GET("/onboarding/:id", handler.GetOnboarding)
 	docs.SwaggerInfo.BasePath = "/"
 	router.GET("/swagger/*any", ginSwagger.WrapHandler(swaggerfiles.Handler))
 
