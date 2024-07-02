@@ -98,7 +98,7 @@
         },
         "/onboarding/{id}/signature": {
             "post": {
-                "description": "Verify signature",
+                "description": "Sign agreement",
                 "consumes": [
                     "application/json"
                 ],
@@ -108,7 +108,7 @@
                 "tags": [
                     "onboarding"
                 ],
-                "summary": "Verify signature",
+                "summary": "Sign agreement",
                 "parameters": [
                     {
                         "type": "string",
@@ -223,7 +223,7 @@
                 "FailedState",
                 "FraudNotPassedState",
                 "SignatureNotValidSate",
-                "WaitingForAgreementSignatureState",
+                "WaitingForAgreementSign",
                 "CompletedState"
             ]
         }

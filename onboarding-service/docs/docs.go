@@ -107,7 +107,7 @@ const docTemplate = `{
         },
         "/onboarding/{id}/signature": {
             "post": {
-                "description": "Verify signature",
+                "description": "Sign agreement",
                 "consumes": [
                     "application/json"
                 ],
@@ -117,7 +117,7 @@ const docTemplate = `{
                 "tags": [
                     "onboarding"
                 ],
-                "summary": "Verify signature",
+                "summary": "Sign agreement",
                 "parameters": [
                     {
                         "type": "string",
@@ -232,7 +232,7 @@ const docTemplate = `{
                 "FailedState",
                 "FraudNotPassedState",
                 "SignatureNotValidSate",
-                "WaitingForAgreementSignatureState",
+                "WaitingForAgreementSign",
                 "CompletedState"
             ]
         }

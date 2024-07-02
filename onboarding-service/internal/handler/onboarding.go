@@ -12,7 +12,7 @@ import (
 type onboardingService interface {
 	CreateOnboarding(ctx context.Context, req *httpModel.OnboardingRequest) (httpModel.OnboardingStatus, error)
 	GetOnboarding(ctx context.Context, id uuid.UUID) (httpModel.OnboardingStatus, error)
-	VerifySignature(ctx context.Context, id uuid.UUID, req *httpModel.SignatureRequest) (httpModel.OnboardingStatus, error)
+	SignAgreement(ctx context.Context, id uuid.UUID, req *httpModel.SignatureRequest) (httpModel.OnboardingStatus, error)
 }
 
 type OnboardingHandler struct {
@@ -76,9 +76,9 @@ func (h *OnboardingHandler) GetOnboarding(c *gin.Context) {
 	c.JSON(http.StatusOK, response)
 }
 
-// VerifySignature godoc
-// @Summary Verify signature
-// @Description Verify signature
+// SignAgreement godoc
+// @Summary Sign agreement
+// @Description Sign agreement
 // @Tags onboarding
 // @Accept json
 // @Produce json
@@ -88,7 +88,7 @@ func (h *OnboardingHandler) GetOnboarding(c *gin.Context) {
 // @Failure 400 {object} http.ErrorResponse
 // @Failure 500 {object} http.ErrorResponse
 // @Router /onboarding/{id}/signature [post]
-func (h *OnboardingHandler) VerifySignature(c *gin.Context) {
+func (h *OnboardingHandler) SignAgreement(c *gin.Context) {
 	id, err := uuid.Parse(c.Param("id"))
 	if err != nil {
 		sendErrorResponse(c, http.StatusBadRequest, "Invalid request")
@@ -100,9 +100,9 @@ func (h *OnboardingHandler) VerifySignature(c *gin.Context) {
 		return
 	}
 
-	response, err := h.service.VerifySignature(c, id, &request)
+	response, err := h.service.SignAgreement(c, id, &request)
 	if err != nil {
-		sendErrorResponse(c, http.StatusInternalServerError, "Unable to verify signature")
+		sendErrorResponse(c, http.StatusInternalServerError, "Unable to sign agreement")
 		return
 	}
 

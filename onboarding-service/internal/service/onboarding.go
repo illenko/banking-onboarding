@@ -70,15 +70,15 @@ func (s *OnboardingService) GetOnboarding(ctx context.Context, id uuid.UUID) (ht
 	}, nil
 }
 
-func (s *OnboardingService) VerifySignature(ctx context.Context, id uuid.UUID, req *http.SignatureRequest) (http.OnboardingStatus, error) {
+func (s *OnboardingService) SignAgreement(ctx context.Context, id uuid.UUID, req *http.SignatureRequest) (http.OnboardingStatus, error) {
 	currentState, err := s.getCurrentState(ctx, id)
 
 	if err != nil {
 		return http.OnboardingStatus{}, err
 	}
 
-	if currentState.State != state.WaitingForAgreementSignatureState {
-		slog.WarnContext(ctx, "Invalid state for signature verification")
+	if currentState.State != state.WaitingForAgreementSign {
+		slog.WarnContext(ctx, "Invalid state for agreement signature")
 		return http.OnboardingStatus{
 			ID:    id,
 			State: currentState.State,

@@ -10,14 +10,14 @@ import (
 type onboardingHandler interface {
 	CreateOnboarding(c *gin.Context)
 	GetOnboarding(c *gin.Context)
-	VerifySignature(c *gin.Context)
+	SignAgreement(c *gin.Context)
 }
 
 func New(handler onboardingHandler) *gin.Engine {
 	router := gin.Default()
 
 	router.POST("/onboarding", handler.CreateOnboarding)
-	router.POST("/onboarding/:id/signature", handler.VerifySignature)
+	router.POST("/onboarding/:id/signature", handler.SignAgreement)
 	router.GET("/onboarding/:id", handler.GetOnboarding)
 	docs.SwaggerInfo.BasePath = "/"
 	router.GET("/swagger/*any", ginSwagger.WrapHandler(swaggerfiles.Handler))

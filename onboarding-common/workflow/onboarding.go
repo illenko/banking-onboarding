@@ -100,7 +100,7 @@ func Onboarding(ctx workflow.Context, input input.Onboarding) (output.Onboarding
 	// 5. Wait for signature
 	logger.Info("Waiting for agreement signature", "AgreementID", createAgreementResult.ID)
 	currentState = output.Onboarding{
-		State: state.WaitingForAgreementSignatureState,
+		State: state.WaitingForAgreementSign,
 		Data:  map[string]any{"link": createAgreementResult.Link},
 	}
 

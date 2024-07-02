@@ -50,7 +50,7 @@ definitions:
     - FailedState
     - FraudNotPassedState
     - SignatureNotValidSate
-    - WaitingForAgreementSignatureState
+    - WaitingForAgreementSign
     - CompletedState
 info:
   contact: {}
@@ -120,7 +120,7 @@ paths:
     post:
       consumes:
       - application/json
-      description: Verify signature
+      description: Sign agreement
       parameters:
       - description: Onboarding ID
         in: path
@@ -148,7 +148,7 @@ paths:
           description: Internal Server Error
           schema:
             $ref: '#/definitions/http.ErrorResponse'
-      summary: Verify signature
+      summary: Sign agreement
       tags:
       - onboarding
 swagger: "2.0"
