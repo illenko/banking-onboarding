@@ -1,7 +1,7 @@
 # Banking Onboarding
 
 Set of services for onboarding new customers to a bank.
-For more details find [My Medium article](https://medium.com)
+For more details find [My Medium article]([https://medium.com](https://medium.com/@kostiantynillienko/temporal-and-go-implement-onboarding-flow-in-banking-applications-a19139137657).
 
 ### Prerequisites
 
